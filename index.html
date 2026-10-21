@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出游搭子 · 出行垂类方案生成 | 产品方案与交互 Demo</title>
+<meta name="description" content="面向已定出行意向、方案未成型的用户，用「澄清—生成—透明—可调」四步链路，把一句模糊需求变成一份拿走就能走的定制行程。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2307C160'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='6.5'/%3E%3Cpath d='M14.6 9.4l-1.5 3.7-3.7 1.5 1.5-3.7z'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root{
+    --green:#07C160;
+    --green-d:#05A34F;
+    --green-soft:#E9F8EF;
+    --ink:#14171A;
+    --ink-2:#3D4450;
+    --muted:#6B7280;
+    --line:#E7EAEE;
+    --bg:#FFFFFF;
+    --bg-2:#F7F8FA;
+    --amber:#B26A00;
+    --amber-soft:#FFF6E6;
+    --radius:16px;
+    --max:1060px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.7;font-size:15.5px;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+
+  /* ---------- 顶部导航 ---------- */
+  header{
+    position:sticky;top:0;z-index:50;background:rgba(255,255,255,.86);
+    backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);
+  }
+  .nav{display:flex;align-items:center;gap:22px;height:60px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.2px}
+  .brand .mark{
+    width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#07C160,#04A24E);
+    display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(7,193,96,.32)
+  }
+  .nav-links{display:flex;gap:20px;margin-left:auto}
+  .nav-links a{font-size:13.5px;color:var(--muted);transition:color .2s}
+  .nav-links a:hover{color:var(--ink)}
+  .nav .cta{
+    margin-left:6px;background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;
+    padding:8px 16px;border-radius:999px;transition:transform .2s,background .2s
+  }
+  .nav .cta:hover{background:#000;transform:translateY(-1px)}
+  @media(max-width:820px){.nav-links{display:none}}
+
+  /* ---------- Hero ---------- */
+  .hero{position:relative;overflow:hidden;padding:64px 0 72px;
+    background:
+      radial-gradient(680px 340px at 78% -8%, rgba(7,193,96,.13), transparent 62%),
+      radial-gradient(520px 300px at 6% 0%, rgba(120,160,255,.10), transparent 60%);
+  }
+  .hero .wrap{display:grid;grid-template-columns:1.08fr .92fr;gap:56px;align-items:center}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--green-d);
+    background:var(--green-soft);border:1px solid #CBEED8;border-radius:999px;padding:5px 12px;margin-bottom:22px
+  }
+  .eyebrow i{width:6px;height:6px;border-radius:50%;background:var(--green);display:block}
+  h1{font-size:52px;line-height:1.18;letter-spacing:-1.2px;font-weight:800}
+  h1 em{font-style:normal;color:var(--green);position:relative}
+  h1 em::after{content:"";position:absolute;left:0;right:0;bottom:5px;height:10px;background:rgba(7,193,96,.13);z-index:-1;border-radius:3px}
+  .lead{margin-top:20px;font-size:16.5px;color:var(--ink-2);max-width:520px}
+  .lead b{color:var(--ink);font-weight:600}
+  .cta-row{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:12px;
+    font-size:14.5px;font-weight:600;transition:transform .18s,box-shadow .18s,background .18s
+  }
+  .btn-p{background:var(--green);color:#fff;box-shadow:0 6px 18px rgba(7,193,96,.28)}
+  .btn-p:hover{background:var(--green-d);transform:translateY(-1px);box-shadow:0 8px 22px rgba(7,193,96,.34)}
+  .btn-s{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .btn-s:hover{border-color:#CFD6DE;transform:translateY(-1px)}
+  .meta{margin-top:30px;display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .meta span{display:flex;align-items:center;gap:6px}
+  .meta span::before{content:"";width:5px;height:5px;border-radius:50%;background:#C9CFD6}
+
+  /* ---------- 手机预览 ---------- */
+  .phone{
+    width:330px;height:640px;margin-left:auto;background:#fff;border-radius:38px;
+    box-shadow:0 30px 70px rgba(18,26,38,.16),0 0 0 10px #1D1F24,0 0 0 11px #34373E;
+    overflow:hidden;position:relative;display:flex;flex-direction:column;
+  }
+  .p-nav{background:#F8F9FA;padding:26px 14px 10px;border-bottom:1px solid #EDEFF2;display:flex;align-items:center;gap:9px;flex-shrink:0}
+  .p-logo{width:27px;height:27px;border-radius:8px;background:linear-gradient(135deg,#07C160,#04A24E);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .p-title{font-size:14px;font-weight:700;line-height:1.3}
+  .p-title .b{font-size:9px;background:var(--green);color:#fff;border-radius:4px;padding:1px 4px;vertical-align:2px;margin-left:4px;font-weight:500}
+  .p-sub{font-size:10px;color:#9AA0A6;margin-top:1px}
+  .p-steps{display:flex;background:#fff;padding:9px 8px 8px;border-bottom:1px solid #EEF0F3;flex-shrink:0}
+  .p-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .p-step .d{width:6px;height:6px;border-radius:50%;background:#DDE1E6}
+  .p-step .t{font-size:8.5px;color:#B7BDC6}
+  .p-step.on .d{background:var(--green);box-shadow:0 0 0 3px rgba(7,193,96,.14)}
+  .p-step.on .t{color:var(--green);font-weight:700}
+  .p-step.done .d{background:#8FE3B4}
+  .p-step.done .t{color:#8FE3B4}
+  .p-chat{flex:1;overflow:hidden;padding:12px 10px;display:flex;flex-direction:column;gap:11px;background:#F4F5F7}
+  .p-row{display:flex;gap:7px;align-items:flex-start}
+  .p-row.me{justify-content:flex-end}
+  .p-av{width:22px;height:22px;border-radius:50%;background:#E7EAF0;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+  .p-av.g{background:var(--green-soft);color:var(--green-d)}
+  .bub{background:#fff;border-radius:12px;padding:9px 11px;font-size:11.5px;line-height:1.6;max-width:247px;box-shadow:0 1px 2px rgba(0,0,0,.04);color:#2B3038}
+  .bub.me{background:var(--green);color:#fff;border-bottom-right-radius:4px}
+  .card{background:#fff;border-radius:13px;padding:11px;max-width:247px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .card h5{font-size:11.5px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+  .card h5 .tag{font-size:8.5px;font-weight:500;color:var(--green-d);background:var(--green-soft);padding:1px 5px;border-radius:4px}
+  .frow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:10.5px;border-bottom:1px dashed #F0F2F5}
+  .frow:last-child{border:0}
+  .frow .k{color:#8A9099}
+  .frow .v{font-weight:600;color:#23282F;display:flex;align-items:center;gap:4px}
+  .frow .v i{font-style:normal;font-size:8.5px;font-weight:500;color:var(--green-d);background:var(--green-soft);border-radius:3px;padding:0 3px}
+  .tl{display:flex;flex-direction:column;gap:0}
+  .tn{display:flex;gap:8px;position:relative;padding-bottom:9px}
+  .tn:last-child{padding-bottom:0}
+  .tn::before{content:"";position:absolute;left:9px;top:20px;bottom:0;width:1px;background:#EDF0F3}
+  .tn:last-child::before{display:none}
+  .tn .ic{width:19px;height:19px;border-radius:50%;background:#F1F4F7;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;z-index:1}
+  .tn .tx{font-size:10.5px;line-height:1.45}
+  .tn .tx b{display:block;font-weight:600;color:#23282F}
+  .tn .tx span{color:#9AA0A6;font-size:9.5px}
+  .warn{background:#F0FAF3;border:1px solid #C9EBD6;color:#0B7A0B;font-size:9.5px;border-radius:8px;padding:6px 8px;margin:8px 0 9px;line-height:1.5}
+  .p-inbar{background:#F8F9FA;border-top:1px solid #EDEFF2;padding:9px 10px 14px;flex-shrink:0}
+  .p-in{background:#fff;border-radius:999px;padding:7px 12px;font-size:10.5px;color:#B7BDC6;border:1px solid #E9ECF0}
+
+  /* ---------- 通用区块 ---------- */
+  section{padding:76px 0;border-top:1px solid var(--line)}
+  section.alt{background:var(--bg-2)}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:34px;flex-wrap:wrap}
+  .sec-no{font-size:12.5px;font-weight:700;color:var(--green);letter-spacing:1.5px}
+  .sec-head h2{font-size:29px;letter-spacing:-.6px;font-weight:750}
+  .sec-head p{color:var(--muted);font-size:14px;margin-left:auto;max-width:420px;line-height:1.65}
+
+  /* 三卡 */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .cell{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+  .cell .lb{font-size:12px;font-weight:700;color:var(--green-d);letter-spacing:.6px;margin-bottom:10px}
+  .cell h4{font-size:16px;margin-bottom:8px;letter-spacing:-.2px}
+  .cell p{font-size:13.5px;color:var(--muted);line-height:1.7}
+  .cell p b{color:var(--ink-2)}
+
+  /* 表格 */
+  .tbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .tbl th{text-align:left;font-size:12px;letter-spacing:.6px;color:var(--muted);font-weight:600;padding:13px 18px;background:#FAFBFC;border-bottom:1px solid var(--line)}
+  .tbl td{padding:16px 18px;font-size:14px;border-bottom:1px solid #F1F3F6;vertical-align:top}
+  .tbl tr:last-child td{border-bottom:0}
+  .tbl td:first-child{font-weight:650;width:23%}
+  .tbl td:nth-child(2){color:var(--muted);width:33%}
+  .tbl td b{color:var(--green-d);font-weight:600}
+
+  /* 六阶段链路 */
+  .flow{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .stage{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 15px 17px;transition:transform .2s,box-shadow .2s,border-color .2s}
+  .stage:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(18,26,38,.08);border-color:#CFE9D9}
+  .stage .no{font-size:11px;font-weight:800;color:#fff;background:var(--green);width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:11px}
+  .stage h4{font-size:14px;line-height:1.45;margin-bottom:6px;letter-spacing:-.2px}
+  .stage p{font-size:12px;color:var(--muted);line-height:1.65}
+  .stage:not(:last-child)::after{
+    content:"";position:absolute;right:-9px;top:50%;width:8px;height:8px;
+    border-top:1.5px solid #C6CDD5;border-right:1.5px solid #C6CDD5;transform:translateY(-50%) rotate(45deg)
+  }
+  .flow-note{margin-top:20px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:9px}
+  .flow-note .dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+
+  /* 判据 */
+  .crit{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .cr{display:flex;gap:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .cr .n{font-size:13px;font-weight:800;color:#fff;background:var(--ink);border-radius:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .cr.red .n{background:#D9534F}
+  .cr h4{font-size:14.5px;margin-bottom:4px}
+  .cr p{font-size:13px;color:var(--muted);line-height:1.65}
+  .cr .flag{font-size:10.5px;font-weight:700;color:#C0392B;background:#FDEDEC;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:2px}
+  .quote{
+    margin-top:18px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--green);
+    border-radius:12px;padding:16px 20px;font-size:13.5px;color:var(--ink-2)
+  }
+  .quote b{color:var(--ink)}
+
+  /* 指标 */
+  .metric-main{background:linear-gradient(135deg,#F2FBF6,#EAF7F0);border:1px solid #CBEDD9;border-radius:var(--radius);padding:26px 28px;margin-bottom:16px}
+  .metric-main .tag{font-size:12px;font-weight:700;color:var(--green-d);letter-spacing:.6px}
+  .metric-main h3{font-size:22px;margin:8px 0 8px;letter-spacing:-.4px}
+  .metric-main p{font-size:13.5px;color:var(--ink-2)}
+  .metric-main code{background:#fff;border:1px solid #CBEDD9;border-radius:6px;padding:1px 6px;font-size:12.5px;color:var(--green-d);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* 能力边界 */
+  .bound{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .bd{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .bd h4{font-size:13.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .bd h4 .ci{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
+  .bd.yes h4 .ci{background:var(--green)}
+  .bd.no h4 .ci{background:#C5CBD3}
+  .bd ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+  .bd li{font-size:13px;color:var(--muted);padding-left:15px;position:relative;line-height:1.6}
+  .bd li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:#D6DBE1}
+  .bd.yes li::before{background:#9FE0BA}
+
+  /* 竞品 */
+  .comp{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .cp{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+  .cp .who{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px}
+  .cp p{font-size:13px;line-height:1.65;color:var(--ink-2)}
+  .cp.us{border-color:#BFE8CD;background:linear-gradient(180deg,#F4FCF7,#fff);box-shadow:0 8px 20px rgba(7,193,96,.09)}
+  .cp.us .who{color:var(--green-d)}
+  .cp.us p{color:var(--ink)}
+
+  /* 底部 */
+  footer{padding:56px 0 64px;border-top:1px solid var(--line);background:#fff}
+  .foot{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;align-items:flex-start}
+  .foot h4{font-size:15px;margin-bottom:10px}
+  .foot p{font-size:13px;color:var(--muted);max-width:520px;line-height:1.75}
+  .foot-links{display:flex;gap:10px;flex-wrap:wrap}
+  .foot-links a{font-size:13px;border:1px solid var(--line);border-radius:9px;padding:9px 15px;font-weight:600;transition:.2s}
+  .foot-links a:hover{border-color:var(--green);color:var(--green-d)}
+  .copy{margin-top:34px;font-size:12px;color:#A2A9B3;border-top:1px solid #F1F3F6;padding-top:20px}
+
+  @media(max-width:900px){
+    .hero .wrap{grid-template-columns:1fr;gap:40px}
+    .phone{margin:0 auto}
+    h1{font-size:38px}
+    .grid3{grid-template-columns:1fr}
+    .flow{grid-template-columns:repeat(2,1fr)}
+    .stage::after{display:none}
+    .crit,.bound{grid-template-columns:1fr}
+    .comp{grid-template-columns:1fr 1fr}
+    .sec-head p{margin-left:0;max-width:none}
+    section{padding:56px 0}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"></path>
+        </svg>
+      </span>
+      出游搭子
+    </a>
+    <nav class="nav-links">
+      <a href="#who">用户与场景</a>
+      <a href="#pain">痛点</a>
+      <a href="#flow">六阶段链路</a>
+      <a href="#criteria">判据</a>
+      <a href="#metric">指标</a>
+      <a href="#bound">边界</a>
+    </nav>
+    <a class="cta" href="demo.html">打开交互 Demo →</a>
+  </div>
+</header>
+
+<div id="top" class="hero">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow"><i></i>AI 搜索平台 · 出行垂类 · 产品方案</div>
+      <h1>别人给攻略，<br>我们给<em>方案</em>。</h1>
+      <p class="lead">
+        面向「已定出行意向、但方案还没成型」的用户，用<b>澄清 → 生成 → 透明 → 可调</b>四步，
+        把一句模糊的“帮我做个成都攻略”，变成一份考虑了天数、预算、同行人、节奏，<b>拿走就能照着走</b>的定制行程。
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-p" href="demo.html">
+          打开交互 Demo
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-s" href="prototype.html">看线性原型</a>
+      </div>
+      <div class="meta">
+        <span>需求理解一页合并</span>
+        <span>地图 API 时空校验</span>
+        <span>局部重排</span>
+        <span>采纳闭环</span>
+      </div>
+    </div>
+
+    <!-- 静态预览（真机效果） -->
+    <div class="phone" aria-hidden="true">
+      <div class="p-nav">
+        <div class="p-logo">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="p-title">出游搭子<span class="b">方案</span></div>
+          <div class="p-sub">把模糊念头变成能照着走的行程</div>
+        </div>
+      </div>
+      <div class="p-steps">
+        <div class="p-step done"><span class="d"></span><span class="t">意图</span></div>
+        <div class="p-step done"><span class="d"></span><span class="t">理解</span></div>
+        <div class="p-step done"><span class="d"></span><span class="t">采集</span></div>
+        <div class="p-step done"><span class="d"></span><span class="t">校验</span></div>
+        <div class="p-step on"><span class="d"></span><span class="t">呈现</span></div>
+        <div class="p-step"><span class="d"></span><span class="t">采纳</span></div>
+      </div>
+      <div class="p-chat">
+        <div class="p-row me">
+          <div class="bub me">十一带爸妈去成都玩3天，人均1500，别太赶</div>
+          <div class="p-av">我</div>
+        </div>
+        <div class="p-row">
+          <div class="p-av g">🧭</div>
+          <div class="card">
+            <h5>出发前确认几件事 <span class="tag">需求理解</span></h5>
+            <div class="frow"><span class="k">目的地</span><span class="v">成都 <i>query</i></span></div>
+            <div class="frow"><span class="k">同行人</span><span class="v">2 大人 + 2 老人 <i>推断</i></span></div>
+            <div class="frow"><span class="k">玩几天</span><span class="v">3 天 <i>query</i></span></div>
+            <div class="frow"><span class="k">预算</span><span class="v">人均 1500 元 <i>query</i></span></div>
+            <div class="frow"><span class="k">节奏</span><span class="v">轻松、不赶 <i>query</i></span></div>
+          </div>
+        </div>
+        <div class="p-row">
+          <div class="p-av g">🧭</div>
+          <div class="card">
+            <h5>你的行程方案 <span class="tag">已校验</span></h5>
+            <div class="warn">↻ 已自动修正 1 轮：发现 1 段步行 1.2km 超过老人阈值，改为打车</div>
+            <div class="tl">
+              <div class="tn"><div class="ic">🏨</div><div class="tx"><b>春熙路商圈酒店</b><span>14:00 · ¥520/晚</span></div></div>
+              <div class="tn"><div class="ic">🛍️</div><div class="tx"><b>宽窄巷子</b><span>16:00–18:00 · 免费</span></div></div>
+              <div class="tn"><div class="ic">🍽️</div><div class="tx"><b>玉林串串香</b><span>18:30 · 人均 ¥70</span></div></div>
+            </div>
+            <div class="warn" style="background:#F2F7FF;border-color:#C9DCF5;color:#0B5FA5;margin:9px 0 0">✓ Day2 熊猫基地 09:00 出发，避开 10 点后排队高峰</div>
+          </div>
+        </div>
+      </div>
+      <div class="p-inbar"><div class="p-in">可以说：预算再降一点 / 换成更轻松的景点</div></div>
+    </div>
+  </div>
+</div>
+
+<section id="who">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-no">01</span>
+      <h2>为谁、在什么时候解决什么</h2>
+      <p>先切一个小口子：不做灵感期种草，也不做行中导航，只做「行前方案」这一段。</p>
+    </div>
+    <div class="grid3">
+      <div class="cell">
+        <div class="lb">谁</div>
+        <h4>行前方案的决策人</h4>
+        <p>自由行规划期的个人、情侣、家庭决策者，核心是 25–40 岁人群。<b>独行占 42%、家庭游占 27%，80/90 后占 73%</b>（参考马蜂窝 2026 报告）。</p>
+      </div>
+      <div class="cell">
+        <div class="lb">什么时候</div>
+        <h4>出行前 1–4 周</h4>
+        <p>目的地基本定了，但「怎么安排才顺、预算够不够」还没答案。此刻他要的不是更多信息，是一份<b>能直接执行的排期</b>。</p>
+      </div>
+      <div class="cell">
+        <div class="lb">现在怎么办</div>
+        <h4>三件事拼起来用</h4>
+        <p>刷小红书笔记自己拼、用 OTA 行程助手生成一版、再丢给通用 AI 问一遍——<b>三份都不完整</b>，最后还得自己核对时间。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pain" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-no">02</span>
+      <h2>三个卡点，对应三个动作</h2>
+      <p>痛点不是「AI 不会写行程」，而是「写出来的东西不敢用」。</p>
+    </div>
+    <table class="tbl">
+      <thead>
+        <tr><th>用户卡在哪</th><th>根因</th><th>我们做什么</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>需求说不清</td>
+          <td>用户本来就说不出完整约束，只丢一句「帮我做个攻略」</td>
+          <td><b>结构化澄清</b>：3–5 个问题、点选式、20 秒填完</td>
+        </tr>
+        <tr>
+          <td>回答千篇一律</td>
+          <td>生成端缺少个性化输入，只能给模板</td>
+          <td><b>约束化生成</b>：天数、预算、同行人、节奏显式采集后建模</td>
+        </tr>
+        <tr>
+          <td>照着走会翻车</td>
+          <td>AI 隐式猜测 + 数据时效无保障 + 路线本身不成立</td>
+          <td><b>约束透明 + 事实可溯 + 时空校验</b>：不暗猜、不编造、不荒谬</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="flow">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-no">03</span>
+      <h2>一条链路走到底：六个阶段</h2>
+      <p>Demo 左侧的进度条就是这六步，可以完整走一遍。</p>
+    </div>
+    <div class="flow">
+      <div class="stage">
+        <div class="no">1</div>
+        <h4>意图识别与路由</h4>
+        <p>含出行意图 + 方案生成意图才进垂类，其余转通用搜索，不硬接。</p>
+      </div>
+      <div class="stage">
+        <div class="no">2</div>
+        <h4>需求理解<br>一页合一</h4>
+        <p>预填与待确认同卡：绿底是猜的（带依据），橙底等你点头，一次确认。</p>
+      </div>
+      <div class="stage">
+        <div class="no">3</div>
+        <h4>多源信息采集</h4>
+        <p>事实找结构化 POI，时效找搜索，口碑找 UGC，各取所长。</p>
+      </div>
+      <div class="stage">
+        <div class="no">4</div>
+        <h4>生成与校验</h4>
+        <p>约束建模 + 地图 API 时空硬校验；不过就自动回改一轮再复检。</p>
+      </div>
+      <div class="stage">
+        <div class="no">5</div>
+        <h4>透明化呈现</h4>
+        <p>前提写清楚、交通衔接可见、依据与核验时间标出来。</p>
+      </div>
+      <div class="stage">
+        <div class="no">6</div>
+        <h4>调整与采纳</h4>
+        <p>改预算、砍天数只做局部重排；采纳行为反哺画像。</p>
+      </div>
+    </div>
+    <div class="flow-note"><span class="dot"></span>第 2 步「一页合一」是整条链路的效率关键：把猜的和要问的放在同一屏，用户只做一次确认。</div>
+  </div>
+</section>
+
+<section id="criteria" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-no">04</span>
+      <h2>什么才算「可被采纳的方案」</h2>
+      <p>五条同时满足，缺一不合格；前三条是一票否决的红线。</p>
+    </div>
+    <div class="crit">
+      <div class="cr red"><span class="n">1</span><div><h4>硬约束满足<span class="flag">红线</span></h4><p>用户显式给出的天数、预算档、同行人构成 100% 被遵守，不擅自「优化」。</p></div></div>
+      <div class="cr red"><span class="n">2</span><div><h4>时空合理<span class="flag">红线</span></h4><p>无回头路、无闭馆日冲突、相邻点通勤时间符合现实——用地图 API 逐段校验。</p></div></div>
+      <div class="cr red"><span class="n">3</span><div><h4>事实真实<span class="flag">红线</span></h4><p>价格、班次、营业状态标来源与更新时间；查不到的明说「出发前请确认」，绝不编。</p></div></div>
+      <div class="cr"><span class="n">4</span><div><h4>无需二次加工</h4><p>按天分块 + 交通衔接 + 预算表，用户核对一遍就能出发。</p></div></div>
+      <div class="cr"><span class="n">5</span><div><h4>可交互调整</h4><p>改预算、砍天数局部秒级重排，而不是整份重来。</p></div></div>
+      <div class="cr" style="border-style:dashed;background:transparent;align-items:center"><div style="font-size:12.5px;color:var(--muted);line-height:1.7">参照北二外《AI 旅游出行助手能力测评报告（第三期）》：16 款主流产品总分仅 35–61 分，「违背硬约束 / POI 时空不合理 / 逻辑矛盾」计 0 分。</div></div>
+    </div>
+    <div class="quote">换句话说：<b>做到这五条本身就是差异化</b>——不是卷生成能力，而是卷「敢不敢被拿去用」。</div>
+  </div>
+</section>
+
+<section id="metric">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-no">05</span>
+      <h2>怎么衡量它有用</h2>
+      <p>生成出来不算成功，被拿去执行才算。</p>
+    </div>
+    <div class="metric-main">
+      <div class="tag">北极星指标</div>
+      <h3>方案采纳率</h3>
+      <p>生成完整方案后 <code>7 日内</code> 发生 <code>导出 / 收藏 / 分享 / 行中回访</code> 任一行为的会话占比。</p>
+    </div>
+    <div class="grid3">
+      <div class="cell">
+        <div class="lb">驱动</div>
+        <h4>把链路做顺</h4>
+        <p>澄清完成率、单方案调整轮次、关键事实来源覆盖率 —— 三个都直接作用在链路上游。</p>
+      </div>
+      <div class="cell">
+        <div class="lb">护栏</div>
+        <h4>别把信任做坏</h4>
+        <p>时空错误抽检通过率、用户纠错率、重复生成率。重复生成高，说明方案不敢用。</p>
+      </div>
+      <div class="cell">
+        <div class="lb">优先级</div>
+        <h4>先治最痛的两处</h4>
+        <p>P0 澄清与透明（低成本直接治痛点）→ P1 个性化 → P2 信任飞轮与生态。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="bound" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-no">06</span>
+      <h2>接什么，不接什么</h2>
+      <p>垂类能力最怕边界模糊：什么都答，就等于什么都不专。</p>
+    </div>
+    <div class="bound">
+      <div class="bd yes">
+        <h4><span class="ci">✓</span>范围内</h4>
+        <ul>
+          <li>境内自由行的行前方案生成（交通 + 景点 + 住宿）</li>
+          <li>按用户约束定制，与多轮调整</li>
+          <li>行程合理性校验与来源标注</li>
+        </ul>
+      </div>
+      <div class="bd no">
+        <h4><span class="ci">—</span>范围外（转通用搜索或明示不支持）</h4>
+        <ul>
+          <li>灵感期选目的地（「十一去哪人少」→ 给灵感卡片，不做深方案）</li>
+          <li>单一事实查询（「故宫门票多少钱」→ 通用搜索）</li>
+          <li>行中实时需求（排队 / 导航 → 转地图能力）</li>
+          <li>签证出入境等强时效高风险信息 → 明示以官方为准</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-no">07</span>
+      <h2>竞品都占住了什么，空位在哪</h2>
+      <p>三类玩家各有优势，但没人同时做到「中立 + 透明 + 可改」。</p>
+    </div>
+    <div class="comp">
+      <div class="cp"><div class="who">OTA 行程助手</div><p>有交易闭环，库存真实；但行程偏标准化，个性化弱。</p></div>
+      <div class="cp"><div class="who">内容平台 AI</div><p>灵感与口碑丰富，但行程与真实库存、营业时间脱节。</p></div>
+      <div class="cp"><div class="who">通用大模型</div><p>生成力强、写得好读，但模板化，事实要用户自己核。</p></div>
+      <div class="cp us"><div class="who">出游搭子 → 空位</div><p>中立立场 + 约束透明 + 可交互调整，占住「<b>直接可用的个性化方案</b>」。</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <h4>关于这个作品</h4>
+        <p>
+          这是一份「产品定位 + 处理方式 + 交互原型」的完整方案。交互 Demo 为<b>静态演示版</b>：需求理解、行程生成、时空校验、局部重排均由浏览器内的规则引擎完成，内置成都 / 杭州 / 北京 / 西安 / 苏州五城样例数据，不依赖后端与 API Key。
+          真实版本接 LLM 与地图 API，做实时 POI、路径规划与事实核验。
+        </p>
+      </div>
+      <div class="foot-links">
+        <a href="demo.html">交互 Demo</a>
+        <a href="prototype.html">线性原型</a>
+      </div>
+    </div>
+    <div class="copy">出游搭子 · 出行垂类方案生成 · 产品方案与原型</div>
+  </div>
+</footer>
+
+</body>
+</html>

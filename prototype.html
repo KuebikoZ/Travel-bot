@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出行垂类方案查询 · 产品原型</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:#F2F3F5; color:#1A1A1A; min-height:100vh; padding:32px 16px; display:flex; justify-content:center;
+  }
+  .page { display:flex; gap:36px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
+
+  .side { width:320px; }
+  .side h1 { font-size:20px; margin-bottom:6px; }
+  .side .sub { font-size:13px; color:#888; margin-bottom:20px; line-height:1.6; }
+  .panel { background:#fff; border-radius:14px; padding:18px; box-shadow:0 2px 12px rgba(0,0,0,.05); }
+  .panel h3 { font-size:13px; color:#999; font-weight:600; margin-bottom:12px; letter-spacing:1px; }
+  .stage-item { display:flex; gap:10px; padding:9px 10px; border-radius:10px; font-size:13px; line-height:1.5; color:#666; transition:all .3s; }
+  .stage-item .num { width:20px; height:20px; border-radius:50%; background:#E8E8E8; color:#999; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; transition:all .3s; }
+  .stage-item.active { background:#E8F5E9; color:#0B7A0B; font-weight:600; }
+  .stage-item.active .num { background:#07C160; color:#fff; }
+  .stage-item.done { color:#0B7A0B; }
+  .stage-item.done .num { background:#C8E6C9; color:#0B7A0B; }
+  .legend { margin-top:16px; padding-top:14px; border-top:1px solid #F0F0F0; font-size:12px; color:#999; line-height:1.9; }
+  .legend b { color:#555; font-weight:600; }
+
+  .phone { width:392px; height:812px; background:#EDEDED; border-radius:44px; box-shadow:0 20px 60px rgba(0,0,0,.18), 0 0 0 11px #1D1F24, 0 0 0 13px #3A3D44; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:150px; height:26px; background:#1D1F24; border-radius:0 0 18px 18px; z-index:50; }
+
+  .navbar { background:#F7F7F7; padding:38px 16px 10px; text-align:center; border-bottom:1px solid #E3E3E3; flex-shrink:0; }
+  .navbar .title { font-size:17px; font-weight:600; }
+  .navbar .title .badge { display:inline-block; font-size:10px; background:#07C160; color:#fff; border-radius:4px; padding:1px 5px; vertical-align:2px; margin-left:5px; font-weight:500; }
+
+  .stepper { background:#fff; padding:8px 10px; display:flex; justify-content:space-between; border-bottom:1px solid #ECECEC; flex-shrink:0; }
+  .step { display:flex; flex-direction:column; align-items:center; gap:3px; width:16.6%; }
+  .step .dot { width:8px; height:8px; border-radius:50%; background:#DCDCDC; transition:all .4s; }
+  .step .lb { font-size:9px; color:#B3B3B3; transition:all .4s; text-align:center; }
+  .step.on .dot { background:#07C160; box-shadow:0 0 0 3px rgba(7,193,96,.15); }
+  .step.on .lb { color:#07C160; font-weight:700; }
+  .step.done .dot { background:#8FE3B4; }
+  .step.done .lb { color:#8FE3B4; }
+
+  .chat { flex:1; overflow-y:auto; padding:14px 12px 20px; display:flex; flex-direction:column; gap:14px; }
+  .chat::-webkit-scrollbar { width:0; }
+  .row { display:flex; gap:8px; align-items:flex-start; animation:slideUp .35s ease; }
+  .row.user { flex-direction:row-reverse; }
+  @keyframes slideUp { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .avatar { width:36px; height:36px; border-radius:6px; flex-shrink:0; background:linear-gradient(135deg,#07C160,#05A04E); display:flex; align-items:center; justify-content:center; font-size:17px; }
+  .avatar.user { background:linear-gradient(135deg,#5B8DEF,#3E6ED8); }
+  .bubble { max-width:78%; padding:10px 12px; border-radius:8px; font-size:15px; line-height:1.65; position:relative; word-break:break-word; }
+  .row.bot .bubble { background:#fff; border-top-left-radius:2px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .row.user .bubble { background:#95EC69; border-top-right-radius:2px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+
+  .typing { display:flex; gap:4px; padding:4px 2px; }
+  .typing i { width:6px; height:6px; background:#C9C9C9; border-radius:50%; animation:blink 1.2s infinite; }
+  .typing i:nth-child(2){ animation-delay:.2s; } .typing i:nth-child(3){ animation-delay:.4s; }
+  @keyframes blink { 0%,60%,100%{opacity:.3; transform:translateY(0);} 30%{opacity:1; transform:translateY(-3px);} }
+
+  .sysstage { align-self:center; font-size:11px; color:#999; background:#E3E3E6; border-radius:20px; padding:3px 12px; animation:slideUp .35s ease; }
+
+  .card { background:#fff; border-radius:10px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,.05); max-width:100%; }
+  .card h4 { font-size:14px; margin-bottom:8px; }
+  .card h4 .tag { font-size:10px; color:#07C160; background:#E8F5E9; padding:1px 6px; border-radius:3px; margin-left:6px; font-weight:500; vertical-align:1px; }
+  .card h4 .tag.orange { color:#E65100; background:#FFF3E0; }
+
+  /* 需求卡字段行（预填 + 待确认，统一编辑） */
+  .frow { margin-bottom:6px; }
+  .prefill-item { display:flex; justify-content:space-between; align-items:center; padding:8px; background:#F7F9F7; border-radius:8px; font-size:13px; }
+  .frow.bfield .prefill-item { background:#FFF9F2; }
+  .prefill-item .k { color:#888; flex-shrink:0; }
+  .prefill-item .k .et { font-size:9px; padding:1px 4px; border-radius:3px; margin-right:4px; vertical-align:1px; font-weight:600; }
+  .et.c { background:#E8F5E9; color:#07C160; }
+  .et.b { background:#FFF3E0; color:#E65100; }
+  .prefill-item .v { font-weight:600; text-align:right; flex:1; }
+  .prefill-item .v i { display:block; font-style:normal; font-weight:400; font-size:11px; color:#9BA8A0; margin-top:2px; }
+  .prefill-item .v b.pending { color:#E65100; font-weight:600; }
+  .editbtn { margin-left:8px; color:#576B95; font-size:13px; cursor:pointer; flex-shrink:0; border:1px solid #D9E0EE; background:#F4F7FC; border-radius:5px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; }
+  .editbtn:hover { background:#E8EFFA; }
+  .editrow { background:#F0F4FA; border-radius:8px; padding:8px; margin:-2px 0 6px; display:none; }
+  .editrow.open { display:block; animation:slideUp .25s ease; }
+  .custom-line { display:flex; gap:6px; margin-top:8px; align-items:center; }
+  .custom-line .cl-label { font-size:12px; color:#888; flex-shrink:0; }
+  .custom-line input { flex:1; min-width:0; border:1px solid #DCDFE6; border-radius:6px; padding:6px 8px; font-size:13px; outline:none; background:#fff; }
+  .custom-line input:focus { border-color:#07C160; }
+  .custom-line .mini-btn { background:#07C160; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; flex-shrink:0; }
+  .mini-btn:active { background:#06AD56; }
+  .err { color:#E65100; font-size:11px; margin-top:4px; display:none; }
+  .err.show { display:block; }
+  .link { font-size:12px; color:#576B95; margin-top:8px; display:block; cursor:pointer; }
+
+  .chipgroup { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px; }
+  .chip { border:1px solid #DCDFE6; background:#fff; color:#333; border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer; transition:all .15s; user-select:none; }
+  .chip:hover { border-color:#07C160; color:#07C160; }
+  .chip.sel { background:#07C160; border-color:#07C160; color:#fff; }
+  .confirm-btn { width:100%; margin-top:10px; background:#07C160; color:#fff; border:none; border-radius:8px; padding:10px; font-size:15px; font-weight:600; cursor:pointer; }
+  .confirm-btn:disabled { background:#C4E7CF; cursor:not-allowed; }
+  .confirm-btn:not(:disabled):active { background:#06AD56; }
+
+  .src-line { display:flex; align-items:center; gap:8px; font-size:13px; padding:6px 0; color:#555; }
+  .src-line .ico { width:26px; height:26px; border-radius:6px; background:#EEF3FF; color:#3E6ED8; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+  .src-line.ok .ico { background:#E8F5E9; color:#07C160; }
+  .src-line .status { margin-left:auto; font-size:11px; color:#B3B3B3; }
+  .src-line.ok .status { color:#07C160; }
+
+  .plan { max-width:92%; }
+  .premise { background:linear-gradient(135deg,#F0FAF3,#E8F5E9); border:1px dashed #9FD8B4; border-radius:10px; padding:10px 12px; font-size:13px; line-height:1.8; }
+  .premise b { color:#0B7A0B; }
+  .premise .edit { color:#576B95; font-size:12px; cursor:pointer; text-decoration:underline; }
+  .daycard { border-left:3px solid #07C160; background:#FAFAFA; border-radius:0 8px 8px 0; padding:10px 12px; margin-top:10px; }
+  .daycard .day { font-size:14px; font-weight:700; margin-bottom:6px; }
+  .daycard .day span { font-size:11px; color:#999; font-weight:400; margin-left:6px; }
+  .item { display:flex; gap:8px; font-size:13px; padding:4.5px 0; line-height:1.55; }
+  .item .t { color:#07C160; font-weight:600; flex-shrink:0; width:44px; }
+  .item .d { color:#333; flex:1; }
+  .item .d .meta { font-size:11px; color:#A6A6A6; display:block; margin-top:1px; }
+  .item .d .meta .src { color:#8FA3B8; }
+  .item .d .meta .ok { color:#07C160; }
+  .swap { color:#576B95; font-size:11px; cursor:pointer; flex-shrink:0; border:1px solid #D9E0EE; background:#F4F7FC; border-radius:4px; padding:1px 6px; margin-left:4px; white-space:nowrap; }
+  .swap:hover { background:#E8EFFA; }
+  .leg { margin-left:44px; padding:1px 0 1px 12px; border-left:2px dotted #C4D2E0; font-size:11.5px; color:#7E93AC; line-height:1.5; display:flex; align-items:center; gap:5px; }
+  .leg .ok { color:#07C160; }
+  .price { color:#E6773F; font-weight:600; }
+  .backup { margin-top:8px; background:#FFF8EE; border-radius:8px; padding:8px 10px; font-size:12px; color:#8A6D3B; line-height:1.6; }
+  .budget { margin-top:12px; border-top:1px solid #EEE; padding-top:10px; }
+  .budget table { width:100%; border-collapse:collapse; font-size:13px; }
+  .budget td { padding:4px 2px; color:#555; }
+  .budget td:last-child { text-align:right; font-weight:600; color:#333; }
+  .budget tr.total td { border-top:1px dashed #DDD; padding-top:8px; color:#0B7A0B; font-weight:700; font-size:15px; }
+  .action-bar { display:flex; gap:8px; margin-top:14px; }
+  .act-btn { flex:1; border:1px solid #07C160; background:#fff; color:#07C160; border-radius:8px; padding:9px 0; font-size:14px; font-weight:600; cursor:pointer; }
+  .act-btn.primary { background:#07C160; color:#fff; }
+  .act-btn:active { opacity:.8; }
+  .honest { margin-top:10px; font-size:12px; color:#999; line-height:1.7; background:#F7F7F7; border-radius:8px; padding:8px 10px; }
+
+  .adjust-note { font-size:13px; background:#fff; border-radius:10px; padding:10px 12px; line-height:1.7; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .adjust-note .diff-del { color:#C0504D; text-decoration:line-through; background:#FBEAEA; border-radius:3px; padding:0 3px; }
+  .adjust-note .diff-add { color:#0B7A0B; background:#E8F5E9; border-radius:3px; padding:0 3px; font-weight:600; }
+
+  .flywheel { font-size:12px; color:#8FA3B8; background:#F0F4FA; border-radius:8px; padding:8px 10px; margin-top:8px; line-height:1.7; }
+  .alt-desc { font-size:11px; color:#999; display:block; margin-top:2px; }
+
+  .inputbar { background:#F7F7F7; border-top:1px solid #E3E3E3; padding:10px 12px 26px; display:flex; gap:10px; align-items:center; flex-shrink:0; }
+  .inputbar .fake-input { flex:1; background:#fff; border-radius:6px; padding:9px 12px; font-size:14px; color:#333; border:1px solid #E3E3E3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .inputbar .fake-input.placeholder { color:#B3B3B3; }
+  .sendbtn { width:34px; height:34px; background:#07C160; border-radius:50%; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; cursor:pointer; transition:all .2s; }
+  .sendbtn.disabled { background:#E0E0E0; cursor:not-allowed; }
+  .sendbtn.pulse { animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(7,193,96,.35);} 50%{box-shadow:0 0 0 10px rgba(7,193,96,0);} }
+  .input-hint { text-align:center; font-size:11px; color:#B3B3B3; margin-top:4px; height:14px; }
+
+  .toast { position:absolute; left:50%; top:45%; transform:translate(-50%,-50%); background:rgba(0,0,0,.75); color:#fff; font-size:14px; border-radius:10px; padding:12px 20px; z-index:99; opacity:0; pointer-events:none; transition:opacity .3s; max-width:75%; text-align:center; line-height:1.6; }
+  .toast.show { opacity:1; }
+
+  .replay { position:absolute; right:14px; top:46px; z-index:60; background:rgba(0,0,0,.5); color:#fff; border:none; border-radius:14px; padding:4px 12px; font-size:11px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="side">
+    <h1>出行垂类方案查询</h1>
+    <a href="index.html" style="display:inline-block;font-size:12px;color:#8A8F99;text-decoration:none;margin-bottom:8px">← 返回作品首页</a>
+    <div class="sub">交互原型 · 对应《产品定位说明》与《处理方式说明》<br>点击手机右下角的发送按钮，完整走一遍方案生成过程</div>
+    <div class="panel">
+      <h3>六阶段进度（与处理方式说明对应）</h3>
+      <div id="stageList">
+        <div class="stage-item" data-s="1"><span class="num">1</span><div><b>意图识别与路由</b><br>判定"方案生成"意图，进入垂类</div></div>
+        <div class="stage-item" data-s="2"><span class="num">2</span><div><b>需求理解（一页合一）</b><br>C 预填（query 优先于画像）+ B 待确认同卡，一次确认；点选即填好</div></div>
+        <div class="stage-item" data-s="3"><span class="num">3</span><div><b>多源信息采集</b><br>事实找结构化数据，时效找搜索，口碑找 UGC</div></div>
+        <div class="stage-item" data-s="4"><span class="num">4</span><div><b>方案生成与校验</b><br>约束建模 + 地图 API 时空硬校验</div></div>
+        <div class="stage-item" data-s="5"><span class="num">5</span><div><b>透明化呈现</b><br>前提显式 + 景点间交通 + 依据标注</div></div>
+        <div class="stage-item" data-s="6"><span class="num">6</span><div><b>调整与采纳</b><br>改前提 / 换景点 / 局部重排 / 采纳</div></div>
+      </div>
+      <div class="legend">
+        <b>观察点</b><br>
+        ① 预填与待确认合为一页，一次确认<br>
+        ② 预填<b>query 优先于画像</b>（"带爸妈"→2 大人 + 2 老人，共 4 人）<br>
+        ③ 点选即完成该字段，收起编辑区，无需再输入<br>
+        ④ 景点之间有交通衔接（方式/时长/费用）<br>
+        ⑤ 生成后仍可改：改前提、换任一景点
+      </div>
+    </div>
+  </div>
+
+  <div class="phone">
+    <div class="notch"></div>
+    <button class="replay" onclick="location.reload()">↺ 重播</button>
+    <div class="navbar"><div class="title">出行助手<span class="badge">方案</span></div></div>
+    <div class="stepper" id="stepper">
+      <div class="step" data-s="1"><span class="dot"></span><span class="lb">意图</span></div>
+      <div class="step" data-s="2"><span class="dot"></span><span class="lb">理解</span></div>
+      <div class="step" data-s="3"><span class="dot"></span><span class="lb">采集</span></div>
+      <div class="step" data-s="4"><span class="dot"></span><span class="lb">校验</span></div>
+      <div class="step" data-s="5"><span class="dot"></span><span class="lb">呈现</span></div>
+      <div class="step" data-s="6"><span class="dot"></span><span class="lb">采纳</span></div>
+    </div>
+    <div class="chat" id="chat"></div>
+    <div>
+      <div class="inputbar">
+        <div class="fake-input placeholder" id="fakeInput">点击下方按钮发送</div>
+        <div class="sendbtn disabled" id="sendBtn">➤</div>
+      </div>
+      <div class="input-hint" id="inputHint">等待开始…</div>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script>
+const chat = document.getElementById('chat');
+const fakeInput = document.getElementById('fakeInput');
+const sendBtn = document.getElementById('sendBtn');
+const inputHint = document.getElementById('inputHint');
+const toast = document.getElementById('toast');
+
+/* ================= 字段配置 =================
+   engine: c = 画像预填（有默认值+依据）；b = 待确认（无默认，必答）
+   type:   text = 文字输入；int = 整数输入（限格式）          */
+const FIELDS = [
+  { key:'from',   label:'出发地', engine:'c', type:'text', def:'上海', why:'依据：常用收货地址',
+    chips:['上海','南京','成都','北京'], ph:'输入城市名，如：杭州' },
+  { key:'crew',   label:'同行人', engine:'c', type:'text', def:'2 大人 + 2 老人（爸妈）', why:'依据：你说"带爸妈" → 你和爱人 2 大人 + 爸妈 2 老人，共 4 人（优先取 query 信号，非历史画像）',
+    chips:['2 大人 + 2 老人（爸妈）','2 大人 + 1 老人','2 大人 + 1 孩子（6 岁）','夫妻 2 人'], ph:'如：我带爸妈，3 人' },
+  { key:'pace',   label:'节奏', engine:'c', type:'text', def:'轻松慢节奏，少爬山', why:'依据：历史方案中你 3 次替换掉爬山类景点',
+    chips:['轻松慢节奏，少爬山','适中节奏','紧凑打卡'], ph:'如：上午紧凑，下午轻松' },
+  { key:'days',   label:'玩几天', engine:'b', type:'int', def:null, why:'这个我猜不准，选一下或直接输',
+    chips:['3 天 2 晚','4 天 3 晚','5 天以上'], ph:'输入整数（天），如：5' },
+  { key:'budget', label:'预算（人均）', engine:'b', type:'int', def:null, why:'这个我猜不准，选一下或直接输',
+    chips:['¥1000 内','¥1500 左右','¥2000+'], ph:'输入整数（元），如：1800' }
+];
+const state = { fields:{}, changed:[], required:['days','budget'] };
+
+/* ---------- 工具 ---------- */
+function scrollBottom(){ setTimeout(()=>{ chat.scrollTop = chat.scrollHeight; }, 60); }
+function setStage(n, label) {
+  document.querySelectorAll('.step, .stage-item').forEach(el => {
+    const s = +el.dataset.s;
+    el.classList.remove('on', 'active', 'done');
+    if (s < n) el.classList.add('done');
+    if (s === n) el.classList.add(el.classList.contains('step') ? 'on' : 'active');
+  });
+  if (label) sysStage(label);
+}
+function sysStage(text) {
+  const el = document.createElement('div');
+  el.className = 'sysstage'; el.textContent = text;
+  chat.appendChild(el); scrollBottom();
+}
+function addUser(text) {
+  const el = document.createElement('div');
+  el.className = 'row user';
+  el.innerHTML = '<div class="avatar user">我</div><div class="bubble"></div>';
+  el.querySelector('.bubble').textContent = text;
+  chat.appendChild(el); scrollBottom();
+}
+function addBot(html, delay=600) {
+  return new Promise(res => {
+    setTimeout(() => {
+      const tp = document.createElement('div');
+      tp.className = 'row bot';
+      tp.innerHTML = '<div class="avatar">🧭</div><div class="bubble"><div class="typing"><i></i><i></i><i></i></div></div>';
+      chat.appendChild(tp); scrollBottom();
+      setTimeout(() => { tp.querySelector('.bubble').innerHTML = html; scrollBottom(); res(tp); }, Math.min(delay+600, 1300));
+    }, 300);
+  });
+}
+function showToast(msg) {
+  toast.innerHTML = msg; toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), 2400);
+}
+function armInput(text, onSend) {
+  fakeInput.textContent = text; fakeInput.classList.remove('placeholder');
+  sendBtn.classList.remove('disabled'); sendBtn.classList.add('pulse');
+  inputHint.textContent = '点击 ➤ 发送';
+  sendBtn.onclick = () => {
+    sendBtn.onclick = null; sendBtn.classList.remove('pulse'); sendBtn.classList.add('disabled');
+    fakeInput.classList.add('placeholder'); fakeInput.textContent = '等待回复…';
+    inputHint.textContent = '正在处理…';
+    onSend();
+  };
+}
+function disarmInput(msg){ fakeInput.classList.add('placeholder'); fakeInput.textContent = msg || '点击选项继续'; inputHint.textContent = ''; }
+
+/* ---------- 需求卡渲染（预填 + 待确认，一页合一） ---------- */
+function renderFieldCard() {
+  let rows = '';
+  FIELDS.forEach(f => {
+    const isC = f.engine === 'c';
+    const valHtml = isC
+      ? '<b data-v="' + f.key + '">' + f.def + '</b><i>' + f.why + '</i>'
+      : '<b class="pending" data-v="' + f.key + '">待确认</b><i>' + f.why + '</i>';
+    rows += `
+    <div class="frow ${isC ? '' : 'bfield'}">
+      <div class="prefill-item">
+        <span class="k"><span class="et ${isC?'c':'b'}">${isC?'C 预填':'B 待确认'}</span>${f.label}</span>
+        <span class="v">${valHtml}</span>
+        <span class="editbtn" data-edit="${f.key}">✎</span>
+      </div>
+      <div class="editrow" data-er="${f.key}">
+        <div class="chipgroup">
+          ${f.chips.map(c => '<span class="chip" data-set="' + f.key + '">' + c + '</span>').join('')}
+        </div>
+        <div class="custom-line">
+          <span class="cl-label">其他：</span>
+          <input type="text" data-in="${f.key}" placeholder="${f.ph}">
+          <button class="mini-btn" data-ok="${f.key}">确定</button>
+        </div>
+        <div class="err" data-err="${f.key}"></div>
+      </div>
+    </div>`;
+  });
+  return `
+    <div class="card">
+      <h4>出发前确认 5 件事<span class="tag">一次搞定</span></h4>
+      <div style="font-size:12px;color:#999;margin-bottom:8px">绿底是我猜的（<b>query 优先于画像</b>，不对点 ✎ 改）· 橙底需要你定 · 点选即完成，无需再输入</div>
+      ${rows}
+      <button class="confirm-btn" id="reqBtn" disabled>确认，开始规划</button>
+      <a class="link">为什么这么猜？ · 查看和管理我的出行画像 ›</a>
+    </div>`;
+}
+
+/* 字段值写入 + 必答项校验 */
+function setField(key, value, isCustom) {
+  const f = FIELDS.find(x => x.key === key);
+  state.fields[key] = value;
+  const b = document.querySelector('b[data-v="' + key + '"]');
+  b.textContent = value;
+  b.classList.remove('pending');
+  if (isCustom) b.innerHTML = value + ' <i style="display:inline;color:#576B95;font-size:11px">（手输）</i>';
+  const errEl = document.querySelector('.err[data-err="' + key + '"]');
+  if (errEl) errEl.classList.remove('show');
+  /* C 字段被改 → 记录（反哺画像提示用） */
+  if (f.engine === 'c' && value !== f.def && !state.changed.includes(f.label)) state.changed.push(f.label);
+  /* 必答项齐了 → 解锁确认 */
+  if (state.required.every(k => state.fields[k])) document.getElementById('reqBtn').disabled = false;
+}
+
+/* 手输校验：int 限正整数并给范围；text 限非空文字 */
+function validateAndSet(key) {
+  const f = FIELDS.find(x => x.key === key);
+  const input = document.querySelector('input[data-in="' + key + '"]');
+  const errEl = document.querySelector('.err[data-err="' + key + '"]');
+  const raw = input.value.trim();
+  if (!raw) { errEl.textContent = '先输入内容，或直接点上方选项'; errEl.classList.add('show'); return; }
+  if (f.type === 'int') {
+    if (!/^\d+$/.test(raw)) { errEl.textContent = '⚠ 格式：请输入整数（不含小数/文字/单位）'; errEl.classList.add('show'); return; }
+    const n = parseInt(raw, 10);
+    if (key === 'days' && (n < 1 || n > 30)) { errEl.textContent = '⚠ 范围：天数需为 1-30 的整数'; errEl.classList.add('show'); return; }
+    if (key === 'budget' && (n < 100 || n > 99999)) { errEl.textContent = '⚠ 范围：预算需为 100-99999 的整数（元）'; errEl.classList.add('show'); return; }
+    setField(key, key === 'days' ? raw + ' 天' : '¥' + raw, true);
+  } else {
+    if (raw.length > 20) { errEl.textContent = '⚠ 最多 20 字，建议精简描述'; errEl.classList.add('show'); return; }
+    setField(key, raw, true);
+  }
+  input.value = '';
+  /* 手输成功也收起编辑区，视为该字段已确认 */
+  document.querySelector('.editrow[data-er="' + key + '"]').classList.remove('open');
+}
+
+/* ================= 演示脚本 ================= */
+
+window.addEventListener('load', async () => {
+  await addBot('你好呀 👋 我是你的<b>出行规划助手</b>。<br>想出去玩但没头绪？直接说，哪怕只是一句模糊的念头。');
+  armInput('十一想带爸妈出去玩几天，有推荐吗？', scene1);
+});
+
+/* 阶段①：意图识别 */
+async function scene1() {
+  addUser('十一想带爸妈出去玩几天，有推荐吗？');
+  setStage(1, '阶段① 意图识别：出行意图 ✓ 方案意图 ✓ → 进入垂类');
+  await addBot('收到！确定出行 + 需要完整方案，这个我来帮你安排 🎯');
+  await scene2();
+}
+
+/* 阶段②：需求理解（预填 + 待确认，一页合一，一次确认） */
+async function scene2() {
+  setStage(2, '阶段② 需求理解：C 预填 × B 待确认，同卡一次确认');
+  await addBot(renderFieldCard(), 600);
+
+  /* ✎ 展开编辑 */
+  document.querySelectorAll('.editbtn').forEach(btn => {
+    btn.onclick = () => {
+      const row = document.querySelector('.editrow[data-er="' + btn.dataset.edit + '"]');
+      document.querySelectorAll('.editrow').forEach(r => { if (r !== row) r.classList.remove('open'); });
+      row.classList.toggle('open');
+      const inp = row.querySelector('input');
+      if (row.classList.contains('open') && inp) setTimeout(()=>inp.focus(), 100);
+      scrollBottom();
+    };
+  });
+  /* 点选修改：选中即填好，收起编辑区，无需再输入 */
+  document.querySelectorAll('.chip[data-set]').forEach(chip => {
+    chip.onclick = () => {
+      chip.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+      chip.classList.add('sel');
+      setField(chip.dataset.set, chip.textContent.trim(), false);
+      document.querySelector('.editrow[data-er="' + chip.dataset.set + '"]').classList.remove('open');
+      scrollBottom();
+    };
+  });
+  /* 手输修改（Enter 或确定） */
+  document.querySelectorAll('.mini-btn[data-ok]').forEach(btn => {
+    btn.onclick = () => validateAndSet(btn.dataset.ok);
+  });
+  document.querySelectorAll('input[data-in]').forEach(inp => {
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') validateAndSet(inp.dataset.in); });
+  });
+  document.getElementById('reqBtn').onclick = scene2confirm;
+  inputHint.textContent = '橙底两项必答：点选或 ✎ 手输（整数）';
+}
+
+async function scene2confirm() {
+  disarmInput('正在规划…');
+  const F = state.fields;
+  let msg = '好，前提锁定 ✅<div style="font-size:12.5px;color:#666;margin-top:6px;line-height:1.8">' +
+    '📍 ' + F.from + ' 出发 ｜ 👥 ' + F.crew + '<br>⏱ ' + F.days + ' ｜ 💰 人均 ' + F.budget + ' ｜ 🚶 ' + F.pace + '</div>';
+  if (state.changed.length) {
+    msg += '<div style="font-size:12px;color:#999;margin-top:6px">你修改了「' + state.changed.join('、') + '」，已反哺画像，下次预填更准 🔄</div>';
+  }
+  await addBot(msg, 500);
+  await scene3();
+}
+
+/* 阶段③：多源采集 */
+async function scene3() {
+  setStage(3, '阶段③ 多源信息采集：按信息类型选源，事实不靠模型记忆');
+  const card = await addBot(`
+    <div class="card" style="min-width:230px">
+      <h4>好嘞，正在为你收集信息</h4>
+      <div class="src-line"><span class="ico">📊</span>结构化数据：高铁班次 / 酒店实时价<span class="status">查询中…</span></div>
+      <div class="src-line"><span class="ico">🔍</span>联网搜索：十一天气 / 景区预约政策<span class="status">查询中…</span></div>
+      <div class="src-line"><span class="ico">💬</span>UGC 口碑：适合带老人的真实评价<span class="status">查询中…</span></div>
+    </div>`, 400);
+
+  const lines = card.querySelectorAll('.src-line');
+  const done = ['✓ 核验 09-09 14:20', '✓ 晴 18-26℃，西湖需预约', '✓ "西溪电瓶船老人友好" 高频'];
+  lines.forEach((l,i)=>{
+    setTimeout(()=>{
+      l.classList.add('ok');
+      l.querySelector('.status').textContent = done[i];
+      if (i===2) scene4();
+    }, 1100*(i+1));
+  });
+}
+
+/* 阶段④：生成与校验 */
+async function scene4() {
+  setStage(4, '阶段④ 生成与校验：地图 API 校验通勤与动线，无回头路');
+  const F = state.fields;
+  await addBot('信息齐了，正在编排行程：<br>· 约束建模：' + F.crew + ' / ' + F.days + ' / 人均 ' + F.budget + ' / ' + F.pace + '<br>· 时空校验：全部景点间通勤已过地图 API，无回头路 ✔', 400);
+  await scene5();
+}
+
+/* 阶段⑤：透明化呈现（含景点间交通 + 可修改入口） */
+async function scene5() {
+  setStage(5, '阶段⑤ 透明化呈现：前提显式 · 交通衔接 · 依据可溯');
+  const F = state.fields;
+  await addBot(`
+  <div class="card plan">
+    <div class="premise">
+      <b>本方案基于</b>：${F.from} 出发 · ${F.days} · ${F.crew} · 人均预算 ${F.budget} · ${F.pace}<br>
+      <span style="color:#7A9B84">任何前提都可改：</span><span class="edit" id="premiseEdit">点击修改预算 / 天数 ›</span>
+    </div>
+
+    <div class="daycard">
+      <div class="day">Day 1 <span>10月1日 · ${F.from} → 杭州</span></div>
+      <div class="item"><span class="t">08:26</span><span class="d">高铁 G7375 上海虹桥 → 杭州东（2h，老人舒适）<span class="meta"><span class="src">二等座 ¥73 · 结构化数据 · 核验 09-09</span></span></span></div>
+      <div class="leg">🚕 打车 15 分钟 · ¥22 · <span class="ok">已校验</span> → 酒店</div>
+      <div class="item"><span class="t">11:30</span><span class="d">酒店寄存行李 + 湖滨午餐<span class="meta"><span class="src">家庭房 2 间 · ¥420/间/晚 · 含早 · 核验 09-09</span></span></span></div>
+      <div class="leg">🚶 步行 8 分钟 · 600m · 平缓无台阶</div>
+      <div class="item"><span class="t">14:00</span><span class="d">西湖游船（外事码头）→ 三潭印月<span class="meta">船票 <span class="price">¥55</span><span class="src"> · 官方价 · 不爬山全程坐船</span></span></span><span class="swap" data-swap="boat">⇄ 换</span></div>
+      <div class="leg">🚶 步行 5 分钟 · 码头即达</div>
+      <div class="item"><span class="t">17:30</span><span class="d">湖滨银泰晚餐 + 音乐喷泉<span class="meta"><span class="src">UGC 高频"带老人友好" · 28 条提及</span></span></span></div>
+    </div>
+
+    <div class="daycard">
+      <div class="day">Day 2 <span>10月2日 · 西溪湿地一日</span></div>
+      <div class="item"><span class="t">09:00</span><span class="d">西溪湿地 · 电瓶船游览（全程坐船，步行仅 600m）<span class="meta">门票+船票 <span class="price">¥145</span><span class="src"> · 官方小程序 · 核验 09-09</span></span></span><span class="swap" data-swap="xiyou">⇄ 换</span></div>
+      <div class="leg">🚤 湿地内码头摆渡 10 分钟 · 已含在船票内</div>
+      <div class="item"><span class="t">12:30</span><span class="d">湿地内午餐（慢生活街区）<span class="meta">人均 <span class="price">¥60</span><span class="src"> · UGC 均价区间 55-75</span></span></span></div>
+      <div class="leg">🚕 打车 25 分钟 · ¥40 · <span class="ok">已校验</span> → 回酒店</div>
+      <div class="item"><span class="t">15:30</span><span class="d">回酒店午休（带老人预留休息，避免疲劳）</span></div>
+      <div class="leg">🚇 地铁 1 号线 4 站 · ¥3 · 步行 300m</div>
+      <div class="item"><span class="t">17:30</span><span class="d">清河坊历史街区漫步 + 晚餐</span></div>
+    </div>
+
+    <div class="daycard">
+      <div class="day">Day 3 <span>10月3日 · 返程</span></div>
+      <div class="item"><span class="t">09:30</span><span class="d">京杭大运河 · 拱宸桥 + 桥西历史街区（平缓无坡）<span class="meta">免费<span class="src"> · 官方公告</span></span></span></div>
+      <div class="leg">🚢 水上巴士 20 分钟 · ¥3 · 老人喜欢的水上体验</div>
+      <div class="item"><span class="t">12:00</span><span class="d">运河边午餐后取行李<span class="meta">人均 <span class="price">¥55</span></span></span></div>
+      <div class="leg">🚕 打车 18 分钟 · ¥28 · <span class="ok">已校验</span> → 杭州东站</div>
+      <div class="item"><span class="t">14:05</span><span class="d">高铁 G7382 杭州东 → 上海虹桥<span class="meta">二等座 <span class="price">¥73</span><span class="src"> · 核验 09-09</span></span></span></div>
+    </div>
+
+    <div class="backup">☂️ <b>备选与提醒</b>：若下雨，Day 2 下午替换为浙江省博物馆（室内，免费，需提前 1 天预约）。十一断桥人流预计极大，Day 1 已刻意避开断桥路线。</div>
+
+    <div class="budget">
+      <table>
+        <tr><td>交通（往返高铁 + 市内打车/地铁）</td><td>¥250 / 人</td></tr>
+        <tr><td>门票 + 游船</td><td>¥200 / 人</td></tr>
+        <tr><td>住宿（2 晚 × 2 间家庭房 ÷4 人）</td><td>¥420 / 人</td></tr>
+        <tr><td>餐饮</td><td>¥300 / 人</td></tr>
+        <tr class="total"><td>人均合计</td><td>≈ ¥1,170</td></tr>
+      </table>
+      <div style="font-size:11px;color:#A6A6A6;margin-top:4px">预算内 ✓ · 住宿价为 09-09 实时快照，建议出行前 3 天再核验一次</div>
+    </div>
+
+    <div class="honest">🤝 <b>诚实说明</b>：十一当天酒店价格波动较大，上表为当前快照价；高铁票 09-15 开抢，届时我会提醒你——这两处<b>不给"确定"承诺</b>，只给核验时间和提醒。</div>
+  </div>`, 1200);
+
+  scene6();
+}
+
+/* 景点替换备选库 */
+const ALTS = {
+  boat: { title:'Day 1 · 西湖游船，想换成？', options:[
+    { lb:'手划船（私享）', desc:'¥180/船 · 更私密安静，仅 6 人一船', diff:'Day 1 下午：西湖大船 <span class="diff-del">¥55</span> → 手划船私享 <span class="diff-add">¥180/船（÷4 人均 ¥45）</span>，码头不变，动线不变，人均 -¥10' },
+    { lb:'环湖电瓶车', desc:'¥40 · 坐着环湖一圈，完全不走路', diff:'Day 1 下午：游船 → <span class="diff-add">环湖电瓶车 ¥40</span>（湖滨上车，招手即停），人均 -¥15，动线不变' }
+  ]},
+  xiyou: { title:'Day 2 · 西溪湿地，想换成？', options:[
+    { lb:'湘湖景区', desc:'免费 · 更安静人少，同样可坐船', diff:'Day 2 上午：西溪湿地 <span class="diff-del">¥145</span> → <span class="diff-add">湘湖（免费，游船 ¥60 选坐）</span>，打车 30 分钟已校验，人均 -¥85，新合计 ≈ ¥1,085' },
+    { lb:'宋城 + 千古情', desc:'¥310 · 演出震撼，但排队久、久坐 2h', diff:'Day 2 上午：西溪湿地 → <span class="diff-add">宋城 + 千古情演出 ¥310</span>。提醒：排队约 40 分钟，与"轻松节奏"略有冲突，你确认的话我再排' }
+  ]}
+};
+
+/* 阶段⑥：调整与采纳 */
+function scene6() {
+  setStage(6, '阶段⑥ 调整与采纳：改前提 / 换景点 / 局部秒级重排 · 决策权在你');
+  addBot(`
+    <div class="card" style="min-width:230px">
+      <h4>方案拿到手了，随时可调</h4>
+      <div style="font-size:12px;color:#999;margin-bottom:8px">✎ 行程卡里的前提可改 ｜ ⇄ 任一景点可换 ｜ 或直接点下面：</div>
+      <div class="chipgroup">
+        <span class="chip" data-adj="budget">预算降到人均 ¥1000</span>
+        <span class="chip" data-adj="hotel">Day 2 换个更安静的住宿</span>
+      </div>
+      <div class="action-bar" style="margin-top:12px">
+        <button class="act-btn primary" data-act="export">📄 导出行程</button>
+        <button class="act-btn" data-act="copy">📋 复制方案</button>
+        <button class="act-btn" data-act="map">🗺 打开地图</button>
+      </div>
+    </div>`, 500).then(()=>{
+
+    document.getElementById('premiseEdit').onclick = async () => {
+      await addBot(`
+        <div class="card">
+          <h4>改哪个前提？<span class="tag">改前提 → 只重排受影响部分</span></h4>
+          <div style="font-size:12px;color:#999;margin-bottom:4px">预算档（人均）</div>
+          <div class="chipgroup" data-p="budget">
+            <span class="chip">降到 ¥1000 内</span><span class="chip">提到 ¥2000+</span>
+          </div>
+          <div style="font-size:12px;color:#999;margin:6px 0 4px">天数</div>
+          <div class="chipgroup" data-p="days">
+            <span class="chip">改成 4 天 3 晚</span><span class="chip">保持 3 天 2 晚</span>
+          </div>
+        </div>`, 400);
+      document.querySelectorAll('.chipgroup[data-p] .chip').forEach(chip => {
+        chip.onclick = () => {
+          const txt = chip.textContent.trim();
+          if (txt.includes('1000')) adjustDemo('budget');
+          else if (txt.includes('4 天')) adjustDemo('days');
+          else if (txt.includes('2000')) showToast('已升级预算档：酒店可换湖景房 🏞<br>Day 2 增加特色私房菜，人均 ≈ ¥1,850');
+          else showToast('已保持 3 天 2 晚，无变更');
+        };
+      });
+    };
+
+    document.querySelectorAll('.swap').forEach(s => {
+      s.onclick = async () => {
+        const alt = ALTS[s.dataset.swap];
+        if (!alt) return;
+        await addBot(`
+          <div class="card">
+            <h4>${alt.title}</h4>
+            <div class="chipgroup" style="flex-direction:column;align-items:stretch">
+              ${alt.options.map((o,i)=>'<span class="chip" data-opt="'+s.dataset.swap+'-'+i+'" style="text-align:left;padding:9px 12px"><b>'+o.lb+'</b><span class="alt-desc">'+o.desc+'</span></span>').join('')}
+            </div>
+          </div>`, 400);
+        alt.options.forEach((o,i)=>{
+          const el = document.querySelector('[data-opt="' + s.dataset.swap + '-' + i + '"]');
+          el.onclick = () => {
+            el.parentElement.querySelectorAll('.chip').forEach(c=>{c.style.pointerEvents='none';c.classList.remove('sel');});
+            el.classList.add('sel');
+            localReplan(o.diff);
+          };
+        });
+      };
+    });
+
+    document.querySelectorAll('[data-adj]').forEach(c=>{
+      c.onclick = () => {
+        document.querySelectorAll('[data-adj]').forEach(x=>x.style.pointerEvents='none');
+        c.classList.add('sel');
+        adjustDemo(c.dataset.adj);
+      };
+    });
+
+    document.querySelectorAll('[data-act]').forEach(b=>{
+      b.onclick = () => {
+        const map = {
+          export:'已导出为行程卡 📄<br><span style="font-size:11px;opacity:.7">「方案采纳率」+1（采纳 = 导出/复制/打开地图）</span>',
+          copy:'方案全文已复制 📋<br><span style="font-size:11px;opacity:.7">「方案采纳率」+1</span>',
+          map:'已在地图中打开动线 🗺<br><span style="font-size:11px;opacity:.7">「方案采纳率」+1</span>'
+        };
+        showToast(map[b.dataset.act]);
+        setTimeout(showFlywheel, 2400);
+      };
+    });
+    inputHint.textContent = '试试 ⇄ 换景点、✎ 改前提，或点击采纳';
+  });
+}
+
+async function localReplan(diff) {
+  await addBot('<div class="adjust-note">⚡ 已局部重排（其余行程不变）：<br>' + diff + '</div>', 700);
+  showToast('这就是「改得动」——能修改的方案才敢带出门 ✅');
+}
+
+async function adjustDemo(type) {
+  const notes = {
+    budget: '⚡ 已局部重排（2.1 秒，其余行程不变）：<br>· 住宿：湖滨家庭房 <span class="diff-del">¥420/间/晚</span> → 运河沿线家庭房 <span class="diff-add">¥260/间/晚（仍 2 间）</span>（地铁 1 站直达湖滨，通勤 +8 分钟，已过地图校验）<br>· Day 2 游船改联票 <span class="diff-add">省 ¥30</span>，动线不变<br><b>人均合计 ≈ ¥980</b> ✓（达成 ¥1000 目标）',
+    hotel: '⚡ 已局部重排（1.8 秒，其余行程不变）：<br>· 住宿：湖滨商圈 <span class="diff-del">临街家庭房 ×2</span> → <span class="diff-add">运河边安静酒店 ¥390/间/晚 ×2</span>（带老人午休更佳，距地铁站 300m）<br>· Day 2 出发顺序微调：先西溪后运河，动线更顺 <span class="diff-add">已过地图校验</span>',
+    days: '⚡ 已按新前提重排受影响部分：<br>· 新增 <span class="diff-add">Day 4 上午：乌镇西栅半日（高铁 30 分钟直达桐乡，已校验）</span>，下午返程上海<br>· 住宿 +1 晚 ×2 间（÷4 人 +¥210/人）+ 乌镇半日 ≈ ¥100/人，<b>人均合计 ≈ ¥1,480</b>（仍在预算内 ✓）<br>· Day 1-3 动线完全不变'
+  };
+  await addBot('<div class="adjust-note">' + notes[type] + '</div>', 800);
+  showToast('这就是「改得动」——能修改的方案才敢带出门 ✅');
+}
+
+async function showFlywheel() {
+  await addBot(`
+    <div class="flywheel">
+      🔄 <b>飞轮回流</b>：你这次的确认 / 修改 / 替换行为已写入出行画像（仅出行维度，可查看 / 可关闭 / 可清除）。<br>
+      下次你只需要说"十一再帮我排一次"，<b>零追问</b>，直接出方案。
+    </div>`, 400);
+  await addBot('祝你一家人玩得开心 🍁 出发前 3 天我会提醒你核验酒店价格和预约事项。还有想调整的，随时说。');
+  inputHint.textContent = '演示完成 · 点击右上角 ↺ 可重播';
+}
+</script>
+</body>
+</html>
