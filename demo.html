@@ -167,6 +167,12 @@
   .budget .bud-cmp.over { color:#C0392B; }
   .budget .bud-cmp.mid  { color:#B8860B; }
   .budget .bud-cmp.ok   { color:#0B7A0B; }
+  /* 降级 / 报错提示条 */
+  .fbnote { background:#FFF8E6; border:1px solid #F2DFB4; color:#8A6116; border-radius:10px; padding:10px 12px; font-size:12.5px; line-height:1.7; max-width:88%; }
+  .fbnote b { color:inherit; }
+  .fbnote.bad { background:#FDECEA; border-color:#F3C2BC; color:#9B2C22; }
+  .fb-err { color:#9AA0A6; font-size:11px; word-break:break-all; }
+  .fb-retry { display:inline-block; margin-left:8px; font-weight:700; text-decoration:underline; cursor:pointer; color:inherit; }
   .action-bar { display:flex; gap:8px; margin-top:14px; }
   .act-btn { flex:1; min-width:0; white-space:nowrap; border:1px solid #07C160; background:#fff; color:#07C160; border-radius:8px; padding:9px 0; font-size:14px; font-weight:600; cursor:pointer; }
   .act-btn.primary { background:#07C160; color:#fff; }
@@ -242,6 +248,19 @@
     </div>
 
     <div class="panel">
+      <h3>数据源与容错</h3>
+      <div class="health up" id="srcBox" style="align-items:flex-start"><span class="dot"></span><span id="srcText">内置演示引擎 · 本地运行，不依赖网络</span></div>
+      <div class="api-row" style="margin-top:8px">
+        <input id="apiBase" placeholder="可选：填后端地址 https://…" spellcheck="false">
+        <button onclick="applyApiBase()">应用</button>
+      </div>
+      <div style="font-size:11.5px;color:#8A8F99;line-height:1.85;margin-top:9px">
+        三层兜底：远端接口（12s 超时 / 重试 2 次）<br>→ 内置引擎 → 离线模板<br>
+        想看降级效果：地址后加 <b>?fail=1</b>
+      </div>
+    </div>
+
+    <div class="panel">
       <h3>六阶段进度（与处理方式说明对应）</h3>
       <div id="stageList">
         <div class="stage-item" data-s="1"><span class="num">1</span><div><b>意图识别与路由</b><br>判定"方案生成"意图才进垂类</div></div>
@@ -306,15 +325,6 @@ const sendBtn = document.getElementById('sendBtn');
 const inputHint = document.getElementById('inputHint');
 const toast = document.getElementById('toast');
 const quickChips = document.getElementById('quickChips');
-/* API 地址：若本页面就是从 8000 端口打开的，直接用同源地址（绝不会跨域失败）；
-   否则回退到 http://localhost:8000 */
-const _httpServed = /^https?:$/.test(location.protocol);   // 由后端或隧道提供（file:// 打开除外）
-const _sameOrigin8000 = _httpServed && location.port === '8000';
-// 页面本身来自服务端（localhost 或隧道域名）→ 一律同源请求，手机/隧道访问都正确
-let API_BASE = _httpServed ? location.origin : 'http://localhost:8000';
-const apiBaseInput = document.getElementById('apiBase');
-if (apiBaseInput) apiBaseInput.value = API_BASE;
-const OPENED_AS_FILE = location.protocol === 'file:';
 
 /* 会话状态 */
 const state = {
@@ -325,6 +335,7 @@ const state = {
   lastItinerary: null,    // 最近一次行程（供 /api/adjust）
   constraints: null,
   busy: false,
+  retry: null,            // 当前可重试的操作（降级提示条里的「重试」）
 };
 
 /* 演示画像（本地模拟，对应处理方式说明的跨域画像库） */
@@ -396,42 +407,257 @@ function clearQuickChips(){ quickChips.innerHTML=''; }
 function lockInput(){ state.busy=true; sendBtn.classList.add('disabled'); realInput.disabled=true; }
 function unlockInput(){ state.busy=false; sendBtn.classList.remove('disabled'); realInput.disabled=false; }
 
-/* ============ API 层：静态部署版接本地演示引擎 ============ */
-async function api(path, body){
-  return await window.mockApi(path, body);
+/* ============================================================
+   网络层：超时 / 重试 / 三层降级
+   ① 远端接口（配置后启用）：单次超时 + 最多 2 次尝试 + 指数退避
+   ② 内置演示引擎：远端不可用时顶上，界面标注「已降级」
+   ③ 离线模板：连内置引擎都异常时兜底，保证页面永远有内容
+   关键原则：降级了要让人看得见，不能拿样例数据冒充实时结果
+   ============================================================ */
+const NET = {
+  remote: '',          // 远端后端地址，可在左侧面板填写
+  timeout: 12000,      // 单次请求超时（ms）
+  maxAttempts: 2,      // 总尝试次数（含首次）
+  backoff: 800,        // 退避基数
+  source: 'mock',      // remote | mock | static
+  errors: [],
+};
+
+const _qs = new URLSearchParams(location.search);
+const FORCE_FAIL = _qs.has('fail');                      // ?fail=1 演练全链路失败
+NET.remote = (_qs.get('api') || localStorage.getItem('tb_api_base') || '').replace(/\/+$/, '');
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* 把浏览器/HTTP 层的原始报错翻成人话，提示条里直接给用户看 */
+function humanErr(e){
+  const name = (e && e.name) || '', m = (e && e.message) || String(e || '');
+  if(name === 'AbortError') return '请求超时';
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return '网络不可达（服务未启动或域名不通）';
+  if(/HTTP 5\d\d/.test(m)) return '服务端异常（' + m + '）';
+  if(/HTTP 4\d\d/.test(m)) return '请求被拒绝（' + m + '）';
+  return m;
 }
 
-/* 网络层失败（Failed to fetch）＝浏览器根本没连上后端，按打开方式给排错指引 */
-function netFailHint(){
-  if(OPENED_AS_FILE){
-    return '检测到本页是用<b>本地文件方式</b>打开的（file://）——浏览器会拦截它访问本地服务。'
-      +'<br>请改用 <b>http://localhost:8000</b> 打开本页（先启动后端）。';
-  }
-  return '后端可能未启动 —— 到 demo/backend 目录执行 <b>./start.sh</b>，再点左侧「重新检查」。'
-    +'<br>若已启动仍失败，请在<b>系统浏览器</b>里直接打开 '+(API_BASE||'http://localhost:8000');
-}
-/* 仅当是网络层失败时附加排错指引（接口业务错误不啰嗦） */
-function netFailTail(e){
-  const m = ((e && e.message) || '') + '';
-  return /Failed to fetch|NetworkError|Load failed/i.test(m)
-    ? '<br><span style="font-size:12px;color:#999">'+netFailHint()+'</span>' : '';
-}
-
-async function checkHealth(manual){
-  const box=document.getElementById('healthBox'), txt=document.getElementById('healthText');
-  box.className='health down'; txt.textContent='检查中…';
+/* 带超时的 fetch：AbortController + finally 清理定时器 */
+async function fetchWithTimeout(url, options = {}, timeout = NET.timeout){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
   try{
-    const r=await fetch(API_BASE+'/api/health').then(r=>r.json());
-    const p=(r.probe&&r.probe.amap)||{};
-    if(r.llm && p.usable){ box.className='health up'; txt.innerHTML='已连接 · LLM ✓ · 高德 ✓'; }
-    else if(r.llm && !p.usable){ box.className='health down'; txt.innerHTML='LLM ✓ · 高德不可用：'+esc(p.info||p.error||'')+(p.fix?'<br>'+esc(p.fix):''); }
-    else { box.className='health down'; txt.textContent='服务已启动但 Key 未配置'; }
-  }catch(e){
-    box.className='health down';
-    txt.innerHTML='后端未启动 —— '+netFailHint();
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
+/* 业务失败（200 但 ok:false）不该重试，单独区分 */
+class BizError extends Error{
+  constructor(payload){ super('业务失败'); this.payload = payload; }
+}
+
+async function callRemote(path, body, timeoutMs){
+  const res = await fetchWithTimeout(NET.remote + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }, timeoutMs);
+  if(!res.ok) throw new Error('HTTP ' + res.status);     // fetch 只在网络层 reject，HTTP 码要自己判
+  const json = await res.json();
+  if(json && json.ok === false) throw new BizError(json);
+  return json;
+}
+
+/* ---------- 第三层：离线模板（固定经典路线，兜底展示） ---------- */
+const OFFLINE_PLAN = {
+  days: [
+    { date: 'Day1 · 抵达日', items: [
+      { name: '飞机 · 抵达北京', start: '10:50', end: '12:00', type: 'transport', price_note: '按出发地', source: '离线模板' },
+      { name: '王府井商圈酒店', start: '14:00', end: '15:00', type: 'rest', price_note: '¥600/晚', source: '离线模板' },
+      { name: '南锣鼓巷', start: '16:00', end: '17:30', type: 'poi', price_note: '免费', source: '离线模板' },
+      { name: '四季民福烤鸭', start: '18:30', end: '19:45', type: 'meal', price_note: '人均 ¥120', source: '离线模板' }
+    ], legs: [
+      { from: '飞机 · 抵达北京', to: '王府井商圈酒店', mode: '打车', note: '约 45 分钟' },
+      { from: '王府井商圈酒店', to: '南锣鼓巷', mode: '打车', note: '约 20 分钟' },
+      { from: '南锣鼓巷', to: '四季民福烤鸭', mode: '步行', note: '约 15 分钟' }
+    ]},
+    { date: 'Day2', items: [
+      { name: '故宫博物院', start: '09:00', end: '12:30', type: 'poi', price_note: '¥60/人', source: '离线模板' },
+      { name: '护国寺小吃', start: '12:45', end: '13:45', type: 'meal', price_note: '人均 ¥45', source: '离线模板' },
+      { name: '景山公园', start: '14:00', end: '15:00', type: 'poi', price_note: '¥2/人', source: '离线模板' },
+      { name: '全聚德烤鸭', start: '18:30', end: '19:45', type: 'meal', price_note: '人均 ¥180', source: '离线模板' }
+    ], legs: [
+      { from: '故宫博物院', to: '护国寺小吃', mode: '步行', note: '约 18 分钟（北门出）' },
+      { from: '护国寺小吃', to: '景山公园', mode: '打车', note: '约 12 分钟' },
+      { from: '景山公园', to: '全聚德烤鸭', mode: '打车', note: '约 20 分钟' }
+    ]},
+    { date: 'Day3 · 返程日', items: [
+      { name: '颐和园', start: '09:00', end: '12:00', type: 'poi', price_note: '¥30/人', source: '离线模板' },
+      { name: '姚记炒肝', start: '12:30', end: '13:30', type: 'meal', price_note: '人均 ¥40', source: '离线模板' },
+      { name: '飞机 · 返回出发地', start: '16:30', end: '19:00', type: 'transport', price_note: '按出发地', source: '离线模板' }
+    ], legs: [
+      { from: '颐和园', to: '姚记炒肝', mode: '打车', note: '约 35 分钟' },
+      { from: '姚记炒肝', to: '飞机 · 返回出发地', mode: '打车', note: '约 50 分钟' }
+    ]}
+  ],
+  budget_breakdown: [
+    { item: '往返机票（经济舱）', price_range: '¥900-¥1,100' },
+    { item: '住宿 2 晚（2 人同住折算）', price_range: '¥540-¥660' },
+    { item: '餐饮 3 天', price_range: '¥450-¥660' },
+    { item: '门票合计', price_range: '¥92' }
+  ],
+  assumptions: [
+    '离线模板：实时服务与内置引擎都不可用，本方案为固定经典路线',
+    '价格、营业时间、预约要求均未核验，出行前请以官方渠道为准',
+    '恢复连接后点「重试」即可拿到实时生成的结果'
+  ]
+};
+
+function nowText(){
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function offlineFallback(path, body){
+  if(path === '/api/plan'){
+    return { ok: true, data: OFFLINE_PLAN, checked_at: nowText(),
+      validation: ['离线模板：未做实时时空校验，通勤时长为经验估算'],
+      auto_fixed: false };
+  }
+  if(path === '/api/adjust'){
+    return { ok: true, data: { diff_summary: '离线模式下暂不支持局部重排，已为你保留原方案', itinerary: (body && body.itinerary) || OFFLINE_PLAN },
+      validation: [], checked_at: nowText(), auto_fixed: false };
+  }
+  // /api/understand：给一份可继续往下走的最小需求卡
+  const q = String((body && body.query) || '');
+  const city = ['北京', '成都', '杭州', '西安', '苏州'].find(c => q.includes(c)) || '北京';
+  const days = (q.match(/(\d+|[一两二三四五六])\s*[天日]/) || [])[0] || '3 天';
+  return { ok: true, data: {
+    destination: city,
+    start_date: '',
+    prefill: [
+      { key: 'from', value: '上海', source: 'profile', why: '离线模板默认出发地，可改' },
+      { key: 'crew', value: '2 大人', source: 'profile', why: '离线模板默认同行人，可改' },
+      { key: 'days', value: days.replace(/[^\d一两二三四五六]/, m => m) + (/天|日/.test(days) ? '' : ' 天'), source: 'query', why: '从你的输入里取的天数' },
+      { key: 'budget', value: '人均 3000 元', source: 'profile', why: '离线模板默认预算，可改' },
+      { key: 'pace', value: '适中，每天 2-3 个点', source: 'profile', why: '离线模板默认节奏' }
+    ],
+    need_clarify: []
+  }};
+}
+
+/* ---------- 主入口：三层依次尝试 ---------- */
+async function api(path, body, timeoutSec){
+  const timeoutMs = timeoutSec ? timeoutSec * 1000 : NET.timeout;
+  NET.errors = [];
+
+  // ① 远端接口：超时 + 重试 + 指数退避
+  if(NET.remote && !FORCE_FAIL){
+    for(let attempt = 1; attempt <= NET.maxAttempts; attempt++){
+      try{
+        const json = await callRemote(path, body, timeoutMs);
+        NET.source = 'remote';
+        return { ...json, __source: 'remote' };
+      }catch(e){
+        if(e instanceof BizError){          // 业务层拒绝，不重试，也不降级
+          NET.source = 'remote';
+          return { ...e.payload, __source: 'remote' };
+        }
+        NET.errors.push('远端第 ' + attempt + ' 次：' + humanErr(e));
+        if(attempt < NET.maxAttempts){
+          await sleep(NET.backoff * Math.pow(2, attempt - 1) + Math.random() * 200);
+        }
+      }
+    }
+  }
+
+  // ② 内置演示引擎
+  try{
+    if(FORCE_FAIL) throw new Error('演练模式：远端与本地均视为不可用');
+    const json = await window.mockApi(path, body);
+    if(!json || json.ok === false) throw new Error((json && json.raw) || '内置引擎返回异常');
+    NET.source = 'mock';
+    return { ...json, __source: 'mock', __degraded: !!NET.remote || NET.errors.length > 0 };
+  }catch(e){
+    NET.errors.push('内置引擎：' + humanErr(e));
+  }
+
+  // ③ 离线模板
+  NET.source = 'static';
+  return { ...offlineFallback(path, body), __source: 'static', __degraded: true };
+}
+
+/* 降级提示条：把「为什么降级、现在看到的是什么」讲清楚 */
+function srcNote(res){
+  if(!res || !res.__degraded) return '';
+  const detail = (NET.errors || []).slice(-2).map(esc).join('；');
+  const errLine = detail ? '<br><span class="fb-err">' + detail + '</span>' : '';
+  const retry = '<div style="margin-top:6px;text-align:right"><a class="fb-retry" onclick="retryLast()">重试一次 →</a></div>';
+  if(res.__source === 'mock'){
+    return '<div class="fbnote"><b>⚠ 实时服务未响应，已切到内置演示数据</b><br>'
+      + '下面的内容是样例，不是实时结果。' + errLine + retry + '</div>';
+  }
+  return '<div class="fbnote bad"><b>⚠ 实时服务与内置引擎都不可用，已启用离线模板</b><br>'
+    + '这是固定经典路线，价格与营业时间未经核验。' + errLine + retry + '</div>';
+}
+
+function retryLast(){
+  if(typeof state.retry === 'function'){ state.retry(); }
+  else { showToast('没有可重试的操作'); }
+}
+
+/* 兜底：页面级异常也能给一个可操作的出口，而不是白屏 */
+let _fatalAt = 0;
+function showFatal(msg){
+  const now = Date.now();
+  if(now - _fatalAt < 4000) return;      // 节流，避免错误风暴刷屏
+  _fatalAt = now;
+  unlockInput();
+  addBot('<div class="fbnote bad"><b>页面出了点问题</b><br>' + esc(String(msg || '未知异常').slice(0, 160))
+    + '<br><span class="fb-err">已捕获，可重试当前操作或刷新页面</span>'
+    + '<a class="fb-retry" onclick="location.reload()">刷新页面</a></div>');
+}
+window.addEventListener('error', e => { if(e && e.message) showFatal(e.message); });
+window.addEventListener('unhandledrejection', e => {
+  showFatal((e.reason && e.reason.message) || e.reason || '未知异步异常');
+});
+
+/* ---------- 数据源面板 ---------- */
+function paintSource(extra){
+  const box = document.getElementById('srcBox'), txt = document.getElementById('srcText');
+  if(!box || !txt) return;
+  if(!NET.remote){
+    box.className = 'health up';
+    txt.innerHTML = '内置演示引擎 · 本地运行，不依赖网络';
+  } else {
+    box.className = 'health up';
+    txt.innerHTML = '远端接口已配置<br><b>' + esc(NET.remote) + '</b>'
+      + (extra ? '<br>' + extra : '<br>请求失败会自动降级，不会卡住页面');
+  }
+}
+function applyApiBase(){
+  const el = document.getElementById('apiBase');
+  const v = (el.value || '').trim().replace(/\/+$/, '');
+  NET.remote = v;
+  if(v) localStorage.setItem('tb_api_base', v); else localStorage.removeItem('tb_api_base');
+  paintSource();
+  showToast(v ? '已切到远端接口<br>失败会自动降级' : '已切回内置演示引擎');
+  if(v) probeRemote();
+}
+async function probeRemote(){
+  const txt = document.getElementById('srcText');
+  try{
+    const r = await fetchWithTimeout(NET.remote + '/api/health', {}, 5000);
+    paintSource(r.ok ? '连通性检查通过' : '连通性异常：HTTP ' + r.status);
+  }catch(e){
+    paintSource('连不上：' + (e.name === 'AbortError' ? '5s 超时' : e.message) + '（会自动降级）');
+  }
+}
+function initSource(){
+  const el = document.getElementById('apiBase');
+  if(el) el.value = NET.remote;
+  paintSource();
+  if(FORCE_FAIL) showToast('故障演练已开启<br>远端与内置引擎均视为不可用');
+}
 
 /* ============ 阶段①② 输入 query -> 需求理解 ============ */
 async function handleQuery(text){
@@ -452,16 +678,18 @@ async function runUnderstand(text){
   setStage(2,'阶段①② 意图识别 → 需求理解');
   lockInput(); setHint('正在理解你的需求…');
   const tp=addTyping('正在理解你的需求…');
+  state.retry = () => runUnderstand(text);
   try{
     const res=await api('/api/understand',{query:text, profile:PROFILE}, 120);
     tp.remove();
     if(!res.ok){ addBot('⚠️ 理解失败：'+esc(res.raw||'').slice(0,300)); unlockInput(); return; }
+    if(res.__degraded) addBot(srcNote(res));
     renderNeedCard(res.data);
     state.phase='confirming';
     setHint('确认需求后开始规划');
   }catch(e){
     tp.remove();
-    addBot('⚠️ 调用失败：'+esc(e.message)+'<br><span style="font-size:12px;color:#999">'+netFailHint()+'</span>');
+    addBot('<div class="fbnote bad"><b>需求理解没走通</b><br>'+esc(e.message)+'<a class="fb-retry" onclick="retryLast()">重试</a></div>');
     unlockInput();
   }
 }
@@ -606,11 +834,13 @@ async function runPlan(){
   addBot('好的，正在采集信息并规划行程。<div style="font-size:12px;color:#999;margin-top:4px">'+(dateVal?('📅 按 '+esc(dateVal)+' 起连续排期 · '):'')+'比对 POI 开放时间与片区距离，做时空校验…</div>');
   const tp=addTyping('查询景点/天气/通勤中…');
   setHint('正在生成方案（演示引擎运行中）…');
+  state.retry = () => runPlan();
 
   try{
     const res=await api('/api/plan',{constraints:c, start_date:dateVal}, 480);
     tp.remove();
     if(!res.ok){ addBot('⚠️ 生成失败：'+esc(res.raw||'').slice(0,400)); unlockInput(); setHint('生成失败，可重试'); return; }
+    if(res.__degraded) addBot(srcNote(res));
     state.lastItinerary=res.data;
     setStage(5,'阶段⑤ 透明化呈现');
     renderItinerary(res.data,res.validation,res.checked_at,res.auto_fixed);
@@ -620,7 +850,7 @@ async function runPlan(){
     setQuickChips(['预算降到人均1000','改成4天','换成更轻松的景点','加一个博物馆'], t=>{ realInput.value=t; handleQuery(t); });
   }catch(e){
     tp.remove();
-    addBot('⚠️ 生成失败：'+esc(e.message)+netFailTail(e));
+    addBot('<div class="fbnote bad"><b>方案生成没走通</b><br>'+esc(e.message)+'<a class="fb-retry" onclick="retryLast()">重试</a></div>');
     unlockInput(); setHint('生成失败，可重新发送指令重试');
   }
 }
@@ -783,10 +1013,12 @@ async function runAdjust(instruction){
   lockInput(); clearQuickChips();
   const tp=addTyping('正在局部重排…');
   setHint('正在重排（只动受影响的部分）…');
+  state.retry = () => runAdjust(instruction);
   try{
     const res=await api('/api/adjust',{itinerary:state.lastItinerary, instruction}, 420);
     tp.remove();
     if(!res.ok){ addBot('⚠️ 调整失败：'+esc(res.raw||'').slice(0,300)); unlockInput(); return; }
+    if(res.__degraded) addBot(srcNote(res));
     const d=res.data||{};
     if(d.diff_summary) addBot('<div class="adjust-note"><b>⚡ 已局部重排：</b>\n'+esc(d.diff_summary)+'</div>');
     if(d.itinerary){
@@ -798,7 +1030,7 @@ async function runAdjust(instruction){
     setQuickChips(['再省一点','节奏再慢一些','第一天太满了'], t=>{ realInput.value=t; handleQuery(t); });
   }catch(e){
     tp.remove();
-    addBot('⚠️ 调整失败：'+esc(e.message)+netFailTail(e));
+    addBot('<div class="fbnote bad"><b>调整没走通</b><br>'+esc(e.message)+'<a class="fb-retry" onclick="retryLast()">重试</a></div>');
     unlockInput();
   }
 }
@@ -843,6 +1075,7 @@ function renderPreview(){
 
 /* ============ 启动 ============ */
 (function init(){
+  initSource();
   addBot('你好，我是出游搭子。<br>说说你想去哪玩——<b>天数、预算、带谁去</b>说不清楚也没关系，我会先问清楚再帮你规划，生成后还能随时改。<br><span style="font-size:12px;color:#999">当前为静态演示版：需求理解与方案生成由浏览器内的规则引擎完成，覆盖成都/杭州/北京/西安/苏州</span>');
   setQuickChips(['十一带爸妈去成都玩3天，人均1500，别太赶','下周末从上海去杭州玩两天','带孩子去北京玩4天，想加个博物馆'], t=>{ realInput.value=t; handleQuery(t); });
   setHint('输入出行需求，点上方示例也可以');

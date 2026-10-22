@@ -153,6 +153,13 @@
   .toast { position:absolute; left:50%; top:45%; transform:translate(-50%,-50%); background:rgba(0,0,0,.75); color:#fff; font-size:14px; border-radius:10px; padding:12px 20px; z-index:99; opacity:0; pointer-events:none; transition:opacity .3s; max-width:75%; text-align:center; line-height:1.6; }
   .toast.show { opacity:1; }
 
+  /* 兜底遮罩：脚本异常时用 */
+  #crash { position:fixed; inset:0; background:rgba(24,18,16,.72); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; z-index:999; padding:24px; }
+  .crash-card { background:#FBF6EA; border:1px solid #D8C7A0; border-radius:16px; padding:26px 28px; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .crash-t { font-size:18px; font-weight:700; color:#45271A; margin-bottom:10px; }
+  .crash-m { font-size:13px; color:#8A6D3B; line-height:1.7; word-break:break-all; margin-bottom:8px; }
+  .crash-h { font-size:12px; color:#9A8A6A; line-height:1.6; margin-bottom:16px; }
+  .crash-card button { border:none; background:#8C6B3F; color:#fff; border-radius:10px; padding:10px 20px; font-size:13px; font-weight:600; cursor:pointer; }
   .replay { position:absolute; right:14px; top:46px; z-index:60; background:rgba(0,0,0,.5); color:#fff; border:none; border-radius:14px; padding:4px 12px; font-size:11px; cursor:pointer; }
 </style>
 </head>
@@ -637,6 +644,27 @@ async function showFlywheel() {
   await addBot('祝你一家人玩得开心 🍁 出发前 3 天我会提醒你核验酒店价格和预约事项。还有想调整的，随时说。');
   inputHint.textContent = '演示完成 · 点击右上角 ↺ 可重播';
 }
+
+/* ============ 兜底：脚本异常时给一个能继续的出口，而不是卡在半个界面上 ============ */
+let _crashShown = false;
+function crash(msg){
+  if(_crashShown) return;
+  _crashShown = true;
+  const esc = t => String(t == null ? '' : t).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+  const wrap = document.createElement('div');
+  wrap.id = 'crash';
+  wrap.innerHTML = '<div class="crash-card">'
+    + '<div class="crash-t">演示中断了</div>'
+    + '<div class="crash-m">' + esc(msg || '未知异常') + '</div>'
+    + '<div class="crash-h">这只是一段脚本演示，刷新即可从头重播；不影响查看完整原型。</div>'
+    + '<button onclick="location.reload()">↺ 重新播放</button>'
+    + '</div>';
+  document.body.appendChild(wrap);
+}
+window.addEventListener('error', e => {
+  if(e && e.message) crash(e.message + '（' + String(e.filename || '').split('/').pop() + ':' + e.lineno + '）');
+});
+window.addEventListener('unhandledrejection', e => crash((e.reason && e.reason.message) || '未知异步异常'));
 </script>
 </body>
 </html>

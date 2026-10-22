@@ -368,22 +368,59 @@
     return { ok: true, data: { diff_summary: summary, itinerary: it }, validation: [], checked_at: fmtNow(), auto_fixed: false };
   }
 
+  /* ---------- 输出结构自检 ----------
+     宁可返回 ok:false 让上层走降级，也不要把坏数据丢给渲染层导致白屏 */
+  function checkPayload(path, res){
+    if(!res || typeof res !== 'object') return '返回不是对象';
+    if(path === '/api/understand'){
+      if(!res.data || !Array.isArray(res.data.prefill)) return '缺少 prefill 字段';
+      return null;
+    }
+    if(path === '/api/plan'){
+      if(!res.ok) return null;                     // 业务性失败原样交给上层
+      const d = res.data || {};
+      if(!Array.isArray(d.days) || !d.days.length) return '缺少 days';
+      if(!Array.isArray(d.budget_breakdown)) return '缺少 budget_breakdown';
+      const bad = d.days.find(x => !Array.isArray(x.items) || !x.items.length);
+      if(bad) return '存在空日程：' + (bad.date || '未命名');
+      return null;
+    }
+    if(path === '/api/adjust'){
+      const d = res.data || {};
+      if(!d.itinerary || !Array.isArray(d.itinerary.days)) return '缺少 itinerary.days';
+      return null;
+    }
+    return null;
+  }
+
+  /* 人工延迟：?slow=3000 用来演示超时与等待态 */
+  const SLOW = (function(){
+    try{ return Math.max(0, Number(new URLSearchParams(location.search).get('slow')) || 0); }
+    catch(e){ return 0; }
+  })();
+
   /* ---------- 调度 ---------- */
   global.mockApi = function (path, body) {
     return new Promise(resolve => {
       setTimeout(() => {
         try {
-          if (path === '/api/understand') return resolve(understand(body.query));
-          if (path === '/api/plan') {
+          if(!body || typeof body !== 'object') return resolve({ ok: false, raw: '入参为空' });
+          let res;
+          if (path === '/api/understand') res = understand(body.query);
+          else if (path === '/api/plan') {
             ST.dest = (body.constraints || {}).destination || ST.dest;
-            return resolve(buildPlan(body.constraints || {}));
+            res = buildPlan(body.constraints || {});
           }
-          if (path === '/api/adjust') return resolve(adjust(body.itinerary, body.instruction));
-          resolve({ ok: false, raw: '演示模式不支持的接口：' + path });
+          else if (path === '/api/adjust') res = adjust(body.itinerary, body.instruction);
+          else return resolve({ ok: false, raw: '演示模式不支持的接口：' + path });
+
+          const bad = checkPayload(path, res);
+          if(bad) return resolve({ ok: false, raw: '演示引擎输出异常：' + bad });
+          resolve(res);
         } catch (e) {
-          resolve({ ok: false, raw: '演示引擎异常：' + e.message });
+          resolve({ ok: false, raw: '演示引擎异常：' + (e && e.message ? e.message : e) });
         }
-      }, 420 + Math.random() * 480);
+      }, SLOW || (420 + Math.random() * 480));
     });
   };
 })(window);
